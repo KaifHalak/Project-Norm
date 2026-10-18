@@ -5,6 +5,10 @@ from synapse import Synapse
 from brain import Brain
 from concept_lobe import ConceptLobe
 from decision_lobe import DecisionLobe
+from biochemistry import Biochemistry
+from environment import Environment
+from receptor import Receptor
+from emitter import Emitter
 
 
 
@@ -31,33 +35,52 @@ def environment_feedback(action):
 
 
 
+
 def setup_norn():
     """
-    Create our first simple learning Norn.
+    Create a Norn capable of learning about two mushrooms:
 
-    The initial connections favor Ignore.
-    Learning should eventually increase the
-    preference for Eat.
+    C1 = Hungry + Blue mushroom
+    C2 = Hungry + Orange mushroom
+
+    The Norn starts with the same connection weights
+    for both concepts. It does not know which is safe.
     """
 
+    # STEP 1: Create the Concept lobe.
     concepts = ConceptLobe()
 
-    # Register the recognizable situation.
+    # Concept C1 activates when the Norn is hungry
+    # and sees a blue mushroom.
     concepts.add_concept(
         "C1",
         {"hungry": True, "blue_visible": True}
     )
 
+    # Concept C2 activates when the Norn is hungry
+    # and sees an orange mushroom.
+    concepts.add_concept(
+        "C2",
+        {"hungry": True, "orange_visible": True}
+    )
+
+    # STEP 2: Create the Brain.
     brain = Brain()
 
-    # C1 is calculated externally by ConceptLobe.
+    # Register the outputs of the Concept lobe
+    # as external inputs to the Brain.
     brain.add_input("C1")
+    brain.add_input("C2")
 
-    # Decision neurons represent available actions.
+    # STEP 3: Create the Decision neurons.
     #
-    # threshold=0.0 means any positive state can fire.
-    # relaxation_rate=1.0 resets the stored state
-    # after each update, keeping trials independent.
+    # threshold=0.0:
+    # Any positive activation produces output.
+    #
+    # relaxation_rate=1.0:
+    # Reset neuron state after each update so that
+    # activity from one encounter doesn't carry over.
+
     brain.add_neuron(
         "Eat",
         Neuron(threshold=0.0, relaxation_rate=1.0)
@@ -68,28 +91,47 @@ def setup_norn():
         Neuron(threshold=0.0, relaxation_rate=1.0)
     )
 
-    # The Eat decision receives both excitation
-    # and inhibition from Concept C1.
-    brain.add_synapse(
-        "C1", "Eat",
-        Synapse(weight=0.3, conn_type=0)
-    )
+    # STEP 4: Create synapses for both concepts.
+    #
+    # Each concept has three connections:
+    #
+    # 1. Excitatory -> Eat
+    # 2. Inhibitory -> Eat
+    # 3. Excitatory -> Ignore
+    #
+    # Positive reward strengthens the excitatory
+    # Eat connection.
+    #
+    # Punishment strengthens the inhibitory
+    # Eat connection.
 
-    brain.add_synapse(
-        "C1", "Eat",
-        Synapse(weight=0.1, conn_type=1)
-    )
+    for concept in ["C1", "C2"]:
 
-    # Ignore initially has greater activation.
-    brain.add_synapse(
-        "C1", "Ignore",
-        Synapse(weight=0.4, conn_type=0)
-    )
+        # Excitatory connection to Eat.
+        brain.add_synapse(
+            concept,
+            "Eat",
+            Synapse(weight=0.4, conn_type=0)
+        )
 
+        # Inhibitory connection to Eat.
+        brain.add_synapse(
+            concept,
+            "Eat",
+            Synapse(weight=0.1, conn_type=1)
+        )
+
+        # Excitatory connection to Ignore.
+        brain.add_synapse(
+            concept,
+            "Ignore",
+            Synapse(weight=0.25, conn_type=0)
+        )
+
+    # STEP 5: Create the Decision lobe.
     decisions = DecisionLobe(brain)
 
     return concepts, decisions, brain
-
 
 def run_trial(concepts, decisions, brain, perception, epsilon=0.2, learning_enabled=True):
     """
@@ -178,6 +220,119 @@ def run_trial(concepts, decisions, brain, perception, epsilon=0.2, learning_enab
 
     return action, decision_scores, reward
 
+
+
+def run_life_trial(
+    brain,
+    concepts,
+    decisions,
+    body,
+    environment,
+    hunger_receptor,
+    mushroom_color,
+    epsilon=0.2
+):
+    """
+    Simulate one complete food encounter.
+
+    The Norn:
+    1. Perceives its environment.
+    2. Recognizes concepts.
+    3. Chooses an action.
+    4. Experiences biological consequences.
+    5. Produces reward or punishment.
+    6. Updates its synaptic weights.
+    """
+
+    # STEP 1: Build the Norn's perception.
+    # Hunger comes from its actual chemical concentration.
+    # The mushroom color comes from the environment.
+
+    perception = {
+        "hungry": hunger_receptor.is_active(body),
+        "blue_visible": mushroom_color == "blue",
+        "orange_visible": mushroom_color == "orange"
+    }
+
+    # STEP 2: Identify active concepts.
+    # Example: Hungry + Blue -> C1 = 1.0
+
+    concept_outputs = concepts.process(perception)
+
+    # STEP 3: Choose an action.
+    # Epsilon allows the Norn to explore randomly.
+
+    action, decision_scores = decisions.select_action(
+        concept_outputs,
+        epsilon
+    )
+
+    # STEP 4: Mark the synapses responsible for
+    # the chosen action as eligible for reinforcement.
+
+    brain.mark_decision_synapses(
+        concept_outputs,
+        action
+    )
+
+    # STEP 5: Save chemical concentrations BEFORE acting.
+    # We will compare these with the values after the action.
+
+    old_hunger = body.get_chemical("hunger")
+    old_pain = body.get_chemical("pain")
+
+    # STEP 6: Execute the action.
+    # Eating blue reduces hunger.
+    # Eating orange increases pain.
+    # Ignoring does nothing.
+
+    environment.execute_action(
+        body,
+        action,
+        mushroom_color
+    )
+
+    # STEP 7: Generate chemical reinforcement.
+    # Hunger reduction -> Reward
+    # Pain increase -> Punishment
+
+    body.react(old_hunger, old_pain)
+
+    # STEP 8: Read the chemical reinforcement signals.
+
+    reward = body.get_chemical("reward")
+    punishment = body.get_chemical("punishment")
+
+    # STEP 9: Simulate two ticks of delay before
+    # reinforcement reaches eligible synapses.
+
+    for _ in range(2):
+        brain.decay_eligibility()
+
+    # Apply reinforcement using the resulting
+    # susceptibility values.
+
+    brain.apply_reinforcement(
+        reward,
+        punishment
+    )
+
+    # STEP 10: Settle short-term and long-term weights.
+    # STW moves toward LTW.
+    # LTW moves toward STW more slowly.
+
+    for _, _, synapse in brain.synapses:
+        synapse.settle_weights()
+
+    # STEP 11: Clear eligibility.
+    # This encounter is finished.
+    # Learned synaptic weights remain unchanged here.
+
+    brain.clear_eligibility()
+
+    # STEP 12: Return information about the experience.
+
+    return action, reward, punishment
 
 
 
@@ -293,61 +448,170 @@ def run_experiment():
                 )
 
 
-if __name__ == "__main__":
-    run_experiment()
 
+def test_mushroom_learning():
 
-def main():
-    # Use a fixed seed for reproducible exploration.
+    # Make exploration reproducible.
     random.seed(7)
 
-    # Create our learning Norn only once.
+    # STEP 1: Initialize the Norn.
+    # We create the brain ONCE so learning is preserved.
     concepts, decisions, brain = setup_norn()
 
-    # The situation remains the same for this experiment.
-    perception = {
-        "hungry": True,
-        "blue_visible": True
-    }
+    # Create the environment and hunger receptor.
+    environment = Environment()
+    hunger_receptor = Receptor("hunger", 0.5)
 
-    # Check the initial preference without exploration.
-    initial_action, initial_scores = decisions.decide(
-        concepts.process(perception)
-    )
+    # STEP 2: Run 100 food encounters.
+    for trial in range(100):
 
-    print("Before learning:", initial_scores)
-    print("Initially preferred:", initial_action)
-    print()
+        # Create a fresh body for each encounter.
+        #
+        # This is a controlled experiment:
+        # Hunger starts at 0.8 and pain starts at 0.0.
+        #
+        # IMPORTANT:
+        # We reset the BODY, not the BRAIN.
+        # The learned synaptic weights are preserved.
+        body = Biochemistry()
 
-    # Repeat the experience 30 times.
-    for trial in range(1, 31):
+        # Alternate between blue and orange mushrooms.
+        if trial % 2 == 0:
+            color = "blue"
+        else:
+            color = "orange"
 
-        # Each trial may select Eat or Ignore.
-        # The learning updates happen inside run_trial().
-        action, scores, reward = run_trial(
-            concepts,
-            decisions,
-            brain,
-            perception,
+        # Run one complete learning experience.
+        action, reward, punishment = run_life_trial(
+            brain=brain,
+            concepts=concepts,
+            decisions=decisions,
+            body=body,
+            environment=environment,
+            hunger_receptor=hunger_receptor,
+            mushroom_color=color,
             epsilon=0.2
         )
 
-        # Print every fifth trial for easier inspection.
-        if trial % 5 == 0:
+        # Display some training information.
+        if (trial + 1) % 10 == 0:
             print(
-                f"Trial {trial}: "
-                f"Action={action}, Reward={reward:.2f}"
+                f"Trial {trial + 1}: "
+                f"Color={color}, "
+                f"Action={action}, "
+                f"Reward={reward:.2f}, "
+                f"Punishment={punishment:.2f}"
             )
 
-    # Test the learned preference with exploration disabled.
-    final_action, final_scores = decisions.decide(
-        concepts.process(perception)
-    )
+    # STEP 3: Evaluate learning.
+    #
+    # We disable exploration by calling decide()
+    # directly, without using select_action().
+    #
+    # This shows what the Norn has actually learned.
 
-    print()
-    print("After learning:", final_scores)
-    print("Finally preferred:", final_action)
+    print("\n========== FINAL EVALUATION ==========")
+
+    for color in ["blue", "orange"]:
+
+        # Fresh body so hunger is above the threshold.
+        body = Biochemistry()
+
+        perception = {
+            "hungry": hunger_receptor.is_active(body),
+            "blue_visible": color == "blue",
+            "orange_visible": color == "orange"
+        }
+
+        # Identify active concepts.
+        concept_outputs = concepts.process(perception)
+
+        # Choose the preferred action without exploration.
+        action, scores = decisions.decide(concept_outputs)
+
+        print(
+            f"{color.upper()}: "
+            f"Action={action}, Scores={scores}"
+        )
+
+    # STEP 4: Inspect the learned synaptic weights.
+    print("\n========== LEARNED SYNAPSES ==========")
+
+    for source, destination, synapse in brain.synapses:
+
+        conn_type = (
+            "Excitatory" if synapse.conn_type == 0
+            else "Inhibitory"
+        )
+
+        print(
+            f"{source} -> {destination} ({conn_type}): "
+            f"STW={synapse.stw:.3f}, "
+            f"LTW={synapse.ltw:.3f}"
+        )
 
 
 # if __name__ == "__main__":
-#     main()
+#     run_experiment()
+
+
+def main():
+    # Make random exploration reproducible.
+    random.seed(1)
+
+    # STEP 1: Create our existing neural network.
+    concepts, decisions, brain = setup_norn()
+
+    # STEP 2: Create the Norn's biological system.
+    body = Biochemistry()
+
+    # STEP 3: Create the environment.
+    environment = Environment()
+
+    # STEP 4: Create a hunger receptor.
+    # It activates when hunger >= 0.5.
+    hunger_receptor = Receptor("hunger", 0.5)
+
+    # STEP 5: Display the Norn's initial condition.
+    print("========== BEFORE ==========")
+    print("Hunger:", body.get_chemical("hunger"))
+    print("Pain:", body.get_chemical("pain"))
+
+    # STEP 6: Run one food encounter.
+    action, reward, punishment = run_life_trial(
+        brain=brain,
+        concepts=concepts,
+        decisions=decisions,
+        body=body,
+        environment=environment,
+        hunger_receptor=hunger_receptor,
+        mushroom_color="blue",
+        epsilon=1.0
+    )
+
+    # STEP 7: Display the results.
+    print("\n========== AFTER ==========")
+    print("Chosen action:", action)
+    print("Hunger:", body.get_chemical("hunger"))
+    print("Pain:", body.get_chemical("pain"))
+    print("Reward:", reward)
+    print("Punishment:", punishment)
+
+    # STEP 8: Inspect the synaptic weights.
+    print("\n========== SYNAPSES ==========")
+
+    for source, destination, synapse in brain.synapses:
+        conn_type = (
+            "Excitatory" if synapse.conn_type == 0
+            else "Inhibitory"
+        )
+
+        print(
+            f"{source} -> {destination} ({conn_type}): "
+            f"STW={synapse.stw:.3f}, "
+            f"LTW={synapse.ltw:.3f}"
+        )
+
+
+if __name__ == "__main__":
+    test_mushroom_learning()
