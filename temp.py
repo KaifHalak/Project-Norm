@@ -1,6 +1,17 @@
 
 class Biochemistry:
     def __init__(self, hunger=0.8):
+        """Initialize the example's chemical concentrations.
+
+        Args:
+            hunger (float): Initial scalar hunger concentration, e.g. 0.8;
+                default 0.8. Expected to be nonnegative; not validated.
+
+        Returns:
+            None. Initializes self.chemicals as dict[str, float] with keys
+            "hunger", "pain", "hunger_decrease", "pain_increase", "reward",
+            and "punishment". All concentrations except hunger start at 0.0.
+        """
         # Simulated chemical concentrations.
         self.chemicals = {
             "hunger": hunger,
@@ -12,6 +23,16 @@ class Biochemistry:
         }
 
     def emit(self, action):
+        """Introduce chemicals associated with an environmental action.
+
+        Args:
+            action (str): "eat_safe" adds 0.4 hunger_decrease; "eat_poison"
+                adds 0.4 hunger_decrease and 0.3 pain_increase. Other values
+                leave concentrations unchanged.
+
+        Returns:
+            None. Adds the corresponding amounts to self.chemicals in place.
+        """
         # Object interactions introduce chemicals.
         if action == "eat_safe":
             self.chemicals["hunger_decrease"] += 0.4
@@ -23,6 +44,16 @@ class Biochemistry:
             self.chemicals["pain_increase"] += 0.3
 
     def react(self):
+        """Convert available hunger reduction and pain increase into signals.
+
+        Args:
+            No explicit parameters; reads the scalar values in self.chemicals.
+
+        Returns:
+            None. Consumes min(hunger, hunger_decrease) from both concentrations
+            and adds that amount to reward. Transfers all pain_increase into
+            pain and punishment, then resets pain_increase to 0.0.
+        """
         c = self.chemicals
 
         # Reaction 1:
@@ -42,6 +73,16 @@ class Biochemistry:
         c["pain_increase"] = 0.0
 
     def read_receptors(self):
+        """Read the current reinforcement signals.
+
+        Args:
+            No explicit parameters; reads self.chemicals.
+
+        Returns:
+            tuple[float, float]: (reward, punishment), e.g. (0.4, 0.3) after
+            eating poison with initial hunger=0.8 and running react once.
+            Reading does not reset either concentration.
+        """
         # Simplified receptors expose chemical signals
         # to the neural learning system.
         c = self.chemicals
@@ -49,6 +90,18 @@ class Biochemistry:
 
 
 def simulate(hunger, action):
+    """Run and print one biochemical reinforcement example.
+
+    Args:
+        hunger (float): Initial scalar hunger concentration, e.g. 0.8.
+        action (str): Environmental action, e.g. "eat_safe" or "eat_poison".
+            Other values introduce no chemicals.
+
+    Returns:
+        None. Prints the action, initial and final hunger, reward, punishment,
+        and resulting excitatory and inhibitory short-term weights. All
+        simulation objects and scalar weights are local to this call.
+    """
     body = Biochemistry(hunger=hunger)
 
     # The environment introduces chemicals.

@@ -1,6 +1,14 @@
 class Brain:
     
     def __init__(self):
+        """Create an empty brain.
+
+        Args:
+            No explicit parameters.
+
+        Returns:
+            None. Initializes neuron and connection collections on this instance.
+        """
         self.neurons = {} # A: Neuron obk
         self.synapses = [] # [ (source, dest, synapse obj) ]
         
@@ -9,15 +17,45 @@ class Brain:
         self.input_names = set()
         
     def add_neuron(self, name, neuron_obj):
+        """Register a neuron, replacing any existing entry with the same name.
+
+        Args:
+            name (str): Neuron identifier, for example "Eat".
+            neuron_obj (Neuron): Instance whose update(excitation, inhibition)
+                method returns a scalar activation.
+
+        Returns:
+            None. Stores neuron_obj in self.neurons[name].
+        """
         self.neurons[name] = neuron_obj
         
     def add_input(self, name):
+        """Register the name of an externally computed signal.
+
+        Args:
+            name (str): Input identifier, for example "C1".
+
+        Returns:
+            None. Adds name to self.input_names.
+        """
         # Register an externally computed input.
         # The Concept lobe will supply its numerical output.
         self.input_names.add(name)
 
         
     def add_synapse(self, source_name, dest_name, synapse_obj):
+        """Connect a registered source to a registered destination neuron.
+
+        Args:
+            source_name (str): Registered neuron or input name, e.g. "C1".
+            dest_name (str): Registered neuron name, e.g. "Eat".
+            synapse_obj (Synapse): Connection providing transmit(output) and
+                the eligibility and reinforcement methods used by this brain.
+
+        Returns:
+            None. Appends (source_name, dest_name, synapse_obj) to self.synapses.
+            If either name is invalid, prints an error and adds no connection.
+        """
         
         if source_name not in self.neurons and source_name not in self.input_names:
             print(f"Error: Source neuron '{source_name}' does not exist.")
@@ -31,6 +69,17 @@ class Brain:
         
 
     def propagate(self, source_neurons):
+        """Propagate one batch of signals and update each reached neuron once.
+
+        Args:
+            source_neurons (iterable[tuple[str, float]]): Source names paired
+                with scalar activations, e.g. [("C1", 1.0), ("C2", 0.0)].
+
+        Returns:
+            dict[str, float]: Reached destination names mapped to scalar
+            outputs, e.g. {"Eat": 0.7, "Ignore": 0.0}. Returns {} when no
+            connections are reached. Updates destination neurons' internal states.
+        """
         # source_neurons contains tuples:
         # [("A", outputA), ("B", outputB)]
 
@@ -88,16 +137,16 @@ class Brain:
 
     
     def mark_decision_synapses(self, concept_outputs, chosen_action):
-        """
-        Mark synapses involved in the Norn's selected action.
+        """Mark connections from active concepts to the selected action.
 
-        concept_outputs:
-            {"C1": 1.0, "C2": 0.0}
+        Args:
+            concept_outputs (dict[str, float]): Concept activations, e.g.
+                {"C1": 1.0, "C2": 0.0}; only values greater than zero qualify.
+            chosen_action (str | None): Destination neuron name, e.g. "Eat"
+                or "Ignore". None matches no normally named action neuron.
 
-        chosen_action:
-            "Eat" or "Ignore"
-            
-        Remember that the chosen_action is also a neuron
+        Returns:
+            None. Sets susceptibility to 1.0 on matching connections.
         """
         
         for source_name, dest_name, synapse_obj in self.synapses:
@@ -106,8 +155,14 @@ class Brain:
         
 
     def decay_eligibility(self):
-        """
-        Allow susceptibility to fade for all connections.
+        """Allow susceptibility to fade for all connections.
+
+        Args:
+            No explicit parameters; uses self.synapses.
+
+        Returns:
+            None. Decays each connection's susceptibility in place using its
+            default decay factor (0.8 for Synapse).
         """
 
         for synapse in self.synapses:
@@ -115,9 +170,15 @@ class Brain:
 
 
     def apply_reinforcement(self, reward, punishment):
-        """
-        Update susceptible synaptic weights using
-        the provided chemical reinforcement signals.
+        """Update susceptible connections using chemical reinforcement signals.
+
+        Args:
+            reward (float): Scalar reward signal, e.g. 0.4.
+            punishment (float): Scalar punishment signal, e.g. 0.3.
+
+        Returns:
+            None. Reinforces connections with positive susceptibility in place;
+            excitatory connections use reward and inhibitory ones use punishment.
         """
 
         for synapse in self.synapses:
@@ -126,8 +187,13 @@ class Brain:
         
         
     def clear_eligibility(self):
-        """
-        Clear susceptibility after a completed trial.
+        """Clear susceptibility after a completed trial.
+
+        Args:
+            No explicit parameters; uses self.synapses.
+
+        Returns:
+            None. Sets every connection's susceptibility to 0.0.
 
         This is appropriate for our independent food trials.
         Later, in a continuous simulation, we'll retain

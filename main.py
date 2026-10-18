@@ -166,7 +166,7 @@ def run_trial(concepts, decisions, brain, perception, epsilon=0.2, learning_enab
         # STEP 8:
         # Clear eligibility because this independent
         # food encounter has finished.
-    
+        # The reaon for this is that the consequence for each action is immediate, so no need to wait
         brain.clear_eligibility()
         
     
@@ -215,6 +215,9 @@ def run_experiment():
     )
 
     print("========== BEFORE TRAINING ==========")
+    
+    # This is when the weights are fresh. To train, we need to run the sim multiple times
+    
     print("Norn A:", initial_action_a, initial_scores_a)
     print("Norn B:", initial_action_b, initial_scores_b)
 
@@ -346,5 +349,5 @@ def main():
     print("Finally preferred:", final_action)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

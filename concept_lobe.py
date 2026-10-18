@@ -2,6 +2,14 @@
 class ConceptLobe:
 
     def __init__(self):
+        """Create an empty concept registry.
+
+        Args:
+            No explicit parameters.
+
+        Returns:
+            None. Initializes self.concepts as an empty dictionary.
+        """
         # Store concept names and the conditions
         # required for each concept to activate.
         #
@@ -13,6 +21,17 @@ class ConceptLobe:
         self.concepts = {}
 
     def add_concept(self, name, conditions):
+        """Register the conditions that must all match for a concept to activate.
+
+        Args:
+            name (str): Concept identifier, e.g. "C1".
+            conditions (dict[str, object]): Expected sensory values, e.g.
+                {"hungry": True, "blue_visible": True}. Stored by reference.
+
+        Returns:
+            None. Stores or replaces self.concepts[name]. Prints a warning
+            when the previous conditions dictionary is nonempty.
+        """
         
         # Register a new concept with its conditions.
         #
@@ -26,6 +45,18 @@ class ConceptLobe:
 
 
     def process(self, perception):
+        """Match perception values against every registered concept.
+
+        Args:
+            perception (dict[str, object]): Observed sensory values, e.g.
+                {"hungry": True, "blue_visible": False}. Missing keys are
+                compared as None; additional keys are ignored.
+
+        Returns:
+            dict[str, float]: One entry per concept, e.g. {"C1": 0.0, "C2": 1.0}.
+            Values are 1.0 when all conditions match and 0.0 otherwise. A concept
+            with no conditions is active; an empty registry returns {}.
+        """
         all_concept_names = self.concepts.keys()
         
         final_out = {}

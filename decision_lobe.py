@@ -4,6 +4,15 @@ import random
 class DecisionLobe:
 
     def __init__(self, brain):
+        """Attach decision selection to an existing brain.
+
+        Args:
+            brain (Brain): Instance containing concept-to-action connections
+                and action neurons such as "Eat" and "Ignore".
+
+        Returns:
+            None. Stores brain by reference and initializes the action names.
+        """
         # Reuse the existing Brain object, which manages
         # neurons, synapses, and signal propagation.
         self.brain = brain
@@ -12,6 +21,18 @@ class DecisionLobe:
         self.actions = ["Eat", "Ignore"]
 
     def decide(self, concept_outputs):
+        """Select the action with the highest strictly positive activation.
+
+        Args:
+            concept_outputs (dict[str, float]): Concept activations, e.g.
+                {"C1": 1.0, "C2": 0.0}.
+
+        Returns:
+            tuple[str | None, dict[str, float]]: (winning_action, scores), e.g.
+            ("Eat", {"Eat": 0.7, "Ignore": 0.0}). The winner is None if no score
+            exceeds zero. Ties favor the first action in self.actions. Propagating
+            the signals updates the connected neurons' internal states.
+        """
 
         # Convert concept outputs into (name, output) tuples.
         # Example:
@@ -53,17 +74,20 @@ class DecisionLobe:
 
 
     def select_action(self, concept_outputs, epsilon=0.2):
-        """
-        Choose an action using epsilon-greedy exploration.
+        """Choose an action using epsilon-greedy exploration.
 
-        concept_outputs:
-            Dictionary of active and inactive concepts.
-
-        epsilon:
-            Probability of selecting a random action.
+        Args:
+            concept_outputs (dict[str, float]): Concept activations, e.g.
+                {"C1": 1.0, "C2": 0.0}.
+            epsilon (float): Exploration probability, normally in [0.0, 1.0];
+                defaults to 0.2. The range is not validated. Exploration occurs
+                when random.random() <= epsilon.
 
         Returns:
-            (chosen_action, decision_scores)
+            tuple[str | None, dict[str, float]]: (chosen_action, decision_scores),
+            e.g. ("Ignore", {"Eat": 0.7, "Ignore": 0.0}). Scores come from decide
+            even when exploration selects a different action. Without exploration,
+            the action may be None if no score exceeds zero. Updates brain state.
         """
         
         max_action, decision_scores = self.decide(concept_outputs)
