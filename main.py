@@ -9,6 +9,7 @@ from biochemistry import Biochemistry
 from environment import Environment
 from receptor import Receptor
 from emitter import Emitter
+from genome import Genome
 
 
 
@@ -35,103 +36,130 @@ def environment_feedback(action):
 
 
 
+from genome import Genome
 
-def setup_norn():
+
+def setup_norn(genome=None):
     """
-    Create a Norn capable of learning about two mushrooms:
+    Create a Norn's neural network using its genome.
 
-    C1 = Hungry + Blue mushroom
-    C2 = Hungry + Orange mushroom
-
-    The Norn starts with the same connection weights
-    for both concepts. It does not know which is safe.
+    The genome determines:
+    - Neuron threshold
+    - Relaxation rate
+    - Learning rate
+    - Initial synaptic weights
     """
 
-    # STEP 1: Create the Concept lobe.
+    # STEP 1: Create a default genome if none is provided.
+    if genome is None:
+        genome = Genome()
+
+    # STEP 2: Create the Concept lobe.
     concepts = ConceptLobe()
 
-    # Concept C1 activates when the Norn is hungry
-    # and sees a blue mushroom.
+    # C1 recognizes hungry + blue mushroom.
     concepts.add_concept(
         "C1",
         {"hungry": True, "blue_visible": True}
     )
 
-    # Concept C2 activates when the Norn is hungry
-    # and sees an orange mushroom.
+    # C2 recognizes hungry + orange mushroom.
     concepts.add_concept(
         "C2",
         {"hungry": True, "orange_visible": True}
     )
 
-    # STEP 2: Create the Brain.
-    brain = Brain()
+    # STEP 3: Create the Brain.
+    # Its learning rate comes from the genome.
+    brain = Brain(
+        learning_rate=genome.get_gene("learning_rate")
+    )
 
-    # Register the outputs of the Concept lobe
-    # as external inputs to the Brain.
+    # Register Concept lobe outputs as external inputs.
     brain.add_input("C1")
     brain.add_input("C2")
 
-    # STEP 3: Create the Decision neurons.
-    #
-    # threshold=0.0:
-    # Any positive activation produces output.
-    #
-    # relaxation_rate=1.0:
-    # Reset neuron state after each update so that
-    # activity from one encounter doesn't carry over.
+    # STEP 4: Create Decision neurons.
+    # Their parameters come from the genome.
+    for action in ["Eat", "Ignore"]:
 
-    brain.add_neuron(
-        "Eat",
-        Neuron(threshold=0.0, relaxation_rate=1.0)
-    )
+        neuron = Neuron(
+            threshold=genome.get_gene("neuron_threshold"),
+            relaxation_rate=genome.get_gene("relaxation_rate")
+        )
 
-    brain.add_neuron(
-        "Ignore",
-        Neuron(threshold=0.0, relaxation_rate=1.0)
-    )
+        brain.add_neuron(action, neuron)
 
-    # STEP 4: Create synapses for both concepts.
-    #
-    # Each concept has three connections:
-    #
-    # 1. Excitatory -> Eat
-    # 2. Inhibitory -> Eat
-    # 3. Excitatory -> Ignore
-    #
-    # Positive reward strengthens the excitatory
-    # Eat connection.
-    #
-    # Punishment strengthens the inhibitory
-    # Eat connection.
-
+    # STEP 5: Create synapses.
+    # Each concept connects to Eat and Ignore.
     for concept in ["C1", "C2"]:
 
         # Excitatory connection to Eat.
         brain.add_synapse(
             concept,
             "Eat",
-            Synapse(weight=0.4, conn_type=0)
+            Synapse(
+                weight=genome.get_gene("eat_exc_weight"),
+                conn_type=0
+            )
         )
 
         # Inhibitory connection to Eat.
         brain.add_synapse(
             concept,
             "Eat",
-            Synapse(weight=0.1, conn_type=1)
+            Synapse(
+                weight=genome.get_gene("eat_inh_weight"),
+                conn_type=1
+            )
         )
 
         # Excitatory connection to Ignore.
         brain.add_synapse(
             concept,
             "Ignore",
-            Synapse(weight=0.25, conn_type=0)
+            Synapse(
+                weight=genome.get_gene("ignore_weight"),
+                conn_type=0
+            )
         )
 
-    # STEP 5: Create the Decision lobe.
+    # STEP 6: Create Decision lobe.
     decisions = DecisionLobe(brain)
 
     return concepts, decisions, brain
+
+
+
+def setup_body(genome):
+    """
+    Construct a Norn's biochemical system.
+
+    The genome determines how quickly hunger
+    increases when its emitter activates.
+    """
+
+    # Create the biochemical system.
+    body = Biochemistry()
+
+    # Create a hunger emitter using the inherited rate.
+    hunger_emitter = Emitter(
+        chemical="hunger",
+        amount=genome.get_gene("hunger_rate")
+    )
+
+    # Create hunger receptor.
+    # Threshold remains fixed at 0.5 for now.
+    hunger_receptor = Receptor(
+        chemical="hunger",
+        threshold=0.5
+    )
+
+    return body, hunger_emitter, hunger_receptor
+
+
+
+
 
 def run_trial(concepts, decisions, brain, perception, epsilon=0.2, learning_enabled=True):
     """
@@ -551,6 +579,86 @@ def test_mushroom_learning():
         )
 
 
+
+def test_genome_expression():
+
+    # STEP 1: Create two genomes.
+    genome_a = Genome()
+    genome_b = Genome()
+
+    # Give Norn B different inherited characteristics.
+    genome_b.set_gene("learning_rate", 0.8)
+    genome_b.set_gene("eat_exc_weight", 0.6)
+    genome_b.set_gene("hunger_rate", 0.1)
+
+    # STEP 2: Construct both neural networks.
+    concepts_a, decisions_a, brain_a = setup_norn(genome_a)
+    concepts_b, decisions_b, brain_b = setup_norn(genome_b)
+
+    # STEP 3: Construct both biochemical systems.
+    body_a, emitter_a, receptor_a = setup_body(genome_a)
+    body_b, emitter_b, receptor_b = setup_body(genome_b)
+
+    # STEP 4: Compare inherited learning rates.
+    print("========== GENETIC PARAMETERS ==========")
+
+    print("Norn A learning rate:", brain_a.learning_rate)
+    print("Norn B learning rate:", brain_b.learning_rate)
+
+    # STEP 5: Test initial neural decisions.
+    perception = {
+        "hungry": True,
+        "blue_visible": True,
+        "orange_visible": False
+    }
+
+    action_a, scores_a = decisions_a.decide(
+        concepts_a.process(perception)
+    )
+
+    action_b, scores_b = decisions_b.decide(
+        concepts_b.process(perception)
+    )
+
+    print("\n========== INITIAL DECISIONS ==========")
+
+    print("Norn A:", action_a, scores_a)
+    print("Norn B:", action_b, scores_b)
+
+    # STEP 6: Compare metabolism.
+    # Set both Norns' hunger concentrations to 0.4.
+    body_a.add_chemical("hunger", -0.4)
+    body_b.add_chemical("hunger", -0.4)
+
+    # Activate each Norn's hunger emitter once.
+    emitter_a.emit(body_a)
+    emitter_b.emit(body_b)
+
+    print("\n========== HUNGER ==========")
+
+    print("Norn A hunger:", body_a.get_chemical("hunger"))
+    print("Norn B hunger:", body_b.get_chemical("hunger"))
+
+    # STEP 7: Compare pain decay.
+    body_a.add_chemical("pain", 0.5)
+    body_b.add_chemical("pain", 0.5)
+
+    body_a.decay_chemical(
+        "pain",
+        genome_a.get_gene("pain_decay")
+    )
+
+    body_b.decay_chemical(
+        "pain",
+        genome_b.get_gene("pain_decay")
+    )
+
+    print("\n========== PAIN ==========")
+
+    print("Norn A pain:", body_a.get_chemical("pain"))
+    print("Norn B pain:", body_b.get_chemical("pain"))
+
+
 # if __name__ == "__main__":
 #     run_experiment()
 
@@ -614,4 +722,4 @@ def main():
 
 
 if __name__ == "__main__":
-    test_mushroom_learning()
+    test_genome_expression()

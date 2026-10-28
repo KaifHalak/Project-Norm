@@ -1,6 +1,6 @@
 class Brain:
     
-    def __init__(self):
+    def __init__(self, learning_rate=0.5):
         """Create an empty brain.
 
         Args:
@@ -15,6 +15,8 @@ class Brain:
         # Names of input units whose outputs are calculated
         # outside Brain, such as our Concept lobe.
         self.input_names = set()
+        
+        self.learning_rate = learning_rate
         
     def add_neuron(self, name, neuron_obj):
         """Register a neuron, replacing any existing entry with the same name.
@@ -183,7 +185,7 @@ class Brain:
 
         for synapse in self.synapses:
             if synapse[2].susceptibility > 0:
-                synapse[2].reinforce(reward, punishment)
+                synapse[2].reinforce(reward, punishment,  learning_rate=self.learning_rate)
         
         
     def clear_eligibility(self):
