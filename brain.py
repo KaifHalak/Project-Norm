@@ -205,3 +205,25 @@ class Brain:
         # Every synapse has its own susceptibility value.
         for _, _, synapse_obj in self.synapses:
             synapse_obj.susceptibility = 0.0
+            
+    
+    def tick(self):
+        """
+        Advance the brain's time-dependent processes
+        by one simulation tick.
+
+        Every tick:
+        1. Synaptic susceptibility gradually decreases.
+        2. STW and LTW gradually move toward each other.
+
+        Neither process requires new reward or punishment.
+        """
+
+        # STEP 1: Decay susceptibility for every synapse.
+        # This reduces the influence of older actions.
+        self.decay_eligibility()
+
+        # STEP 2: Update short-term and long-term weights.
+        for _, _, synapse in self.synapses:
+            synapse.settle_weights()
+
