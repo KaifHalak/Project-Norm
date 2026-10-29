@@ -37,6 +37,14 @@ class Norn:
 
         # STEP 2: Initialize the Norn's age.
         self.age = 0
+        # The Norn begins fully healthy and alive.
+        self.health = 1.0
+        self.alive = True
+
+        # Statistics accumulated during the Norn's lifetime.
+        self.total_reward = 0.0
+        self.total_punishment = 0.0
+        self.meals_eaten = 0
 
         # STEP 3: Construct its biochemical system.
         self.body = Biochemistry()
@@ -231,6 +239,10 @@ class Norn:
 
         The brain and body persist across steps.
         """
+        
+        # A dead Norn cannot perform another life step.
+        if not self.alive:
+            raise RuntimeError("Dead Norn cannot perform actions.")
 
         # STEP 1: Advance simulation time.
         #
@@ -336,6 +348,19 @@ class Norn:
         #
         # STW and LTW are NOT erased.
         self.brain.clear_eligibility()
+        
+        
+        # Record accumulated biological reinforcement.
+        self.total_reward += reward
+        self.total_punishment += punishment
+
+        # Count how many times the Norn has eaten.
+        if action == "Eat":
+            self.meals_eaten += 1
+
+        # Update health based on the current body condition.
+        self.update_health(reward)
+
 
         # STEP 11: Return information about this life step.
         return {
@@ -346,7 +371,77 @@ class Norn:
             "pain": self.body.get_chemical("pain"),
             "reward": reward,
             "punishment": punishment,
-            "decision_scores": decision_scores
+            "decision_scores": decision_scores,
+            "health": self.health,
+            "alive": self.alive
         }
+        
+        
+    def update_health(self, reward):
+        """
+        Update health based on biological conditions.
+
+        Rules:
+        - Very high hunger causes starvation damage.
+        - Pain causes health damage.
+        - Positive biological reward can restore health.
+        - Health is always between 0.0 and 1.0.
+        - A Norn dies when health reaches zero.
+        """
+
+        # STEP 1: Read current biological conditions.
+        hunger = self.body.get_chemical("hunger")
+        pain = self.body.get_chemical("pain")
+
+        # STEP 2: Calculate health damage.
+        damage = 0.0
+
+        # High hunger causes starvation damage.
+        if hunger >= 0.9:
+            damage += 0.03
+
+        # Pain causes damage proportional to its concentration.
+        # Example: pain=0.5 produces 0.025 damage.
+        damage += pain * 0.05
+
+        # STEP 3: Calculate health recovery.
+        #
+        # For now, reward from hunger reduction also
+        # provides a small health benefit.
+        recovery = reward * 0.1
+
+        # STEP 4: Update health.
+        self.health = max(
+            0.0,
+            min(1.0, self.health - damage + recovery)
+        )
+
+        # STEP 5: Check whether the Norn is still alive.
+        if self.health <= 0.0:
+            self.alive = False
+
+
+
+    def get_fitness(self):
+        """
+        Calculate the Norn's overall fitness.
+
+        Fitness rewards:
+        - Surviving more ticks
+        - Maintaining good health
+        - Experiencing beneficial outcomes
+
+        Fitness penalizes:
+        - Harmful biological outcomes
+        """
+
+        fitness = (
+            self.age
+            + 10.0 * self.health
+            + 5.0 * self.total_reward
+            - 5.0 * self.total_punishment
+        )
+
+        return fitness
 
 
