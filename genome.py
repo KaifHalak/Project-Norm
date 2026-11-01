@@ -99,90 +99,48 @@ class Genome:
         child = Genome(child_genes)
 
         return child
-    
-    
-def mutate(self, mutation_rate=0.1):
-    """
-    Randomly mutate genes in this genome.
 
-    mutation_rate:
-        Probability that each gene will mutate.
+    def mutate(self, mutation_rate=0.1):
+        """
+        Randomly mutate genes in this genome.
 
-    Mutation:
-        Adds a small random positive or negative
-        value to the selected gene.
+        mutation_rate:
+            Probability that each gene will mutate.
 
-    Returns:
-        Dictionary describing which genes changed.
-    """
+        Returns:
+            Dictionary describing which genes changed.
+        """
 
-    # STEP 1: Validate the mutation probability.
-    if not 0.0 <= mutation_rate <= 1.0:
-        raise ValueError(
-            "Mutation rate must be between 0 and 1."
-        )
-
-    # STEP 2: Define mutation rules for each gene.
-    #
-    # Each tuple contains:
-    # (minimum_value for gene, maximum_value for gene, maximum_change)
-    #
-    # Gene-specific limits prevent invalid values.
-    mutation_rules = {
-        "neuron_threshold": (0.0, 1.0, 0.05),
-        "relaxation_rate": (0.0, 1.0, 0.05),
-        "learning_rate": (0.0, 1.0, 0.05),
-
-        "eat_exc_weight": (0.0, 1.0, 0.05),
-        "eat_inh_weight": (0.0, 1.0, 0.05),
-        "ignore_weight": (0.0, 1.0, 0.05),
-
-        "hunger_rate": (0.0, 0.2, 0.01),
-        "pain_decay": (0.0, 1.0, 0.05)
-    }
-
-    # Record mutations for inspection.
-    mutations = {}
-
-    # STEP 3: Examine every gene.
-    for gene_name, old_value in self.genes.items():
-
-        # Randomly decide whether this gene mutates.
-        if random.random() >= mutation_rate:
-            continue
-
-        # Retrieve the gene's permitted limits.
-        min_value, max_value, max_change = (
-            mutation_rules[gene_name]
-        )
-
-        # STEP 4: Generate a random mutation.
-        #
-        # It can increase or decrease the gene value.
-        change = random.uniform(
-            -max_change,
-            max_change
-        )
-
-        new_value = old_value + change
-
-        # STEP 5: Clamp the mutation within
-        # the gene's valid range.
-        new_value = max(
-            min_value,
-            min(new_value, max_value)
-        )
-
-        # STEP 6: Store the mutated gene.
-        self.genes[gene_name] = new_value
-
-        # Record the mutation if the value changed.
-        if new_value != old_value:
-            mutations[gene_name] = (
-                old_value,
-                new_value
+        if not 0.0 <= mutation_rate <= 1.0:
+            raise ValueError(
+                "Mutation rate must be between 0 and 1."
             )
 
-    return mutations
+        mutation_rules = {
+            "neuron_threshold": (0.0, 1.0, 0.05),
+            "relaxation_rate": (0.0, 1.0, 0.05),
+            "learning_rate": (0.0, 1.0, 0.05),
+            "eat_exc_weight": (0.0, 1.0, 0.05),
+            "eat_inh_weight": (0.0, 1.0, 0.05),
+            "ignore_weight": (0.0, 1.0, 0.05),
+            "hunger_rate": (0.0, 0.2, 0.01),
+            "pain_decay": (0.0, 1.0, 0.05)
+        }
 
+        mutations = {}
+        for gene_name, old_value in self.genes.items():
+            if random.random() >= mutation_rate:
+                continue
+
+            min_value, max_value, max_change = mutation_rules[gene_name]
+            new_value = max(
+                min_value,
+                min(old_value + random.uniform(-max_change, max_change),
+                    max_value)
+            )
+            self.genes[gene_name] = new_value
+            if new_value != old_value:
+                mutations[gene_name] = (old_value, new_value)
+
+        return mutations
 
